@@ -20,8 +20,38 @@ LOG_MODULE_DECLARE(net_echo_server_sample, LOG_LEVEL_DBG);
 #include "common.h"
 #include "certificate.h"
 
+#include <shell/shell.h>
+#include <string.h>
+
 static void process_udp4(void);
 static void process_udp6(void);
+
+// test via 'echo raise | nc -u 192.0.2.1 4242'
+static int nrv_raise(void){
+	NET_INFO("Got raise command!");
+	return 0;
+}
+
+// test via 'echo lower | nc -u 192.0.2.1 4242'
+static int nrv_lower(void){
+	NET_INFO("Got lower command!");
+	return 0;
+}
+
+static int nrv_process_incoming_message(char * buffer, uint32_t len) {
+	int ret = -1;
+	if(buffer != NULL) {
+		ret = 0;
+		if (strncmp(buffer, "raise", len) == 0) {
+			nrv_raise();
+		} else if (strncmp(buffer, "lower", len) == 0) {
+			nrv_lower();
+		} else {
+			ret = -2;
+		}
+	}
+	return ret;
+}
 
 K_THREAD_DEFINE(udp4_thread_id, STACK_SIZE,
 		process_udp4, NULL, NULL, NULL,
@@ -112,6 +142,8 @@ static int process_udp(struct data *data)
 		} else if (received) {
 			atomic_add(&data->udp.bytes_received, received);
 		}
+
+		nrv_process_incoming_message(data->udp.recv_buffer, received-1);
 
 		ret = sendto(data->udp.sock, data->udp.recv_buffer, received, 0,
 			     &client_addr, client_addr_len);
@@ -248,3 +280,49 @@ void stop_udp(void)
 		}
 	}
 }
+
+
+static int cmd_nrv_raise(const struct shell *shell, size_t argc,
+                         char **argv)
+{
+        ARG_UNUSED(argc);
+        ARG_UNUSED(argv);
+
+        shell_print(shell, "raising!");
+        nrv_raise();
+        return 0;
+}
+
+static int cmd_nrv_lower(const struct shell *shell, size_t argc,
+                         char **argv)
+{
+        ARG_UNUSED(argc);
+        ARG_UNUSED(argv);
+
+        shell_print(shell, "lowering!");
+        nrv_lower();
+        return 0;
+}
+
+static int cmd_demo_params(const struct shell *shell, size_t argc,
+                           char **argv)
+{
+        int cnt;
+
+        shell_print(shell, "argc = %d", argc);
+        for (cnt = 0; cnt < argc; cnt++) {
+                shell_print(shell, "  argv[%d] = %s", cnt, argv[cnt]);
+        }
+        return 0;
+}
+
+/* Creating subcommands (level 1 command) array for command "demo". */
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_nrv,
+        SHELL_CMD(params, NULL, "Print params command.",
+                                               cmd_demo_params),
+        SHELL_CMD(raise,   NULL, "Raise command.", cmd_nrv_raise),
+        SHELL_CMD(lower,   NULL, "Lower command.", cmd_nrv_lower),
+        SHELL_SUBCMD_SET_END
+);
+/* Creating root (level 0) command "demo" without a handler */
+SHELL_CMD_REGISTER(nrv, &sub_nrv, "NRV commands", NULL);
