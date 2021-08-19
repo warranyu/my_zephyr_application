@@ -37,17 +37,22 @@ static APP_BMEM bool tcp6_handler_in_use[CONFIG_NET_SAMPLE_NUM_HANDLERS];
 #endif
 
 static void process_tcp4(void);
+
+#if defined(CONFIG_NET_IPV6)
 static void process_tcp6(void);
+#endif
 
 K_THREAD_DEFINE(tcp4_thread_id, STACK_SIZE,
 		process_tcp4, NULL, NULL, NULL,
 		THREAD_PRIORITY,
 		IS_ENABLED(CONFIG_USERSPACE) ? K_USER : 0, -1);
 
+#if defined(CONFIG_NET_IPV6)
 K_THREAD_DEFINE(tcp6_thread_id, STACK_SIZE,
 		process_tcp6, NULL, NULL, NULL,
 		THREAD_PRIORITY,
 		IS_ENABLED(CONFIG_USERSPACE) ? K_USER : 0, -1);
+#endif
 
 static ssize_t sendall(int sock, const void *buf, size_t len)
 {
@@ -317,6 +322,7 @@ static void process_tcp4(void)
 	quit();
 }
 
+#if defined(CONFIG_NET_IPV6)
 static void process_tcp6(void)
 {
 	int ret;
@@ -344,6 +350,7 @@ static void process_tcp6(void)
 
 	quit();
 }
+#endif
 
 static void print_stats(struct k_work *work)
 {
@@ -422,6 +429,7 @@ void stop_tcp(void)
 	 * in accept or recv call it seems to be necessary
 	 */
 
+	#if defined(CONFIG_NET_IPV6)
 	if (IS_ENABLED(CONFIG_NET_IPV6)) {
 		k_thread_abort(tcp6_thread_id);
 		if (conf.ipv6.tcp.sock >= 0) {
@@ -439,6 +447,7 @@ void stop_tcp(void)
 			}
 		}
 	}
+	#endif
 
 	if (IS_ENABLED(CONFIG_NET_IPV4)) {
 		k_thread_abort(tcp4_thread_id);

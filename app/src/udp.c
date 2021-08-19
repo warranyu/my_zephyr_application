@@ -24,7 +24,10 @@ LOG_MODULE_DECLARE(net_echo_server_sample, LOG_LEVEL_DBG);
 #include <string.h>
 
 static void process_udp4(void);
+
+#if defined(CONFIG_NET_IPV6)
 static void process_udp6(void);
+#endif
 
 // test via 'echo raise | nc -u 192.0.2.1 4242'
 static int nrv_raise(void){
@@ -58,10 +61,13 @@ K_THREAD_DEFINE(udp4_thread_id, STACK_SIZE,
 		THREAD_PRIORITY,
 		IS_ENABLED(CONFIG_USERSPACE) ? K_USER : 0, -1);
 
+#if defined(CONFIG_NET_IPV6)
 K_THREAD_DEFINE(udp6_thread_id, STACK_SIZE,
 		process_udp6, NULL, NULL, NULL,
 		THREAD_PRIORITY,
 		IS_ENABLED(CONFIG_USERSPACE) ? K_USER : 0, -1);
+#endif
+
 
 static int start_udp_proto(struct data *data, struct sockaddr *bind_addr,
 			   socklen_t bind_addrlen)
@@ -192,6 +198,7 @@ static void process_udp4(void)
 	}
 }
 
+#if defined(CONFIG_NET_IPV6)
 static void process_udp6(void)
 {
 	int ret;
@@ -217,6 +224,7 @@ static void process_udp6(void)
 		}
 	}
 }
+#endif
 
 static void print_stats(struct k_work *work)
 {
@@ -240,6 +248,7 @@ static void print_stats(struct k_work *work)
 
 void start_udp(void)
 {
+	#if defined(CONFIG_NET_IPV6)
 	if (IS_ENABLED(CONFIG_NET_IPV6)) {
 #if defined(CONFIG_USERSPACE)
 		k_mem_domain_add_thread(&app_domain, udp6_thread_id);
@@ -249,6 +258,7 @@ void start_udp(void)
 		k_thread_name_set(udp6_thread_id, "udp6");
 		k_thread_start(udp6_thread_id);
 	}
+	#endif
 
 	if (IS_ENABLED(CONFIG_NET_IPV4)) {
 #if defined(CONFIG_USERSPACE)
@@ -266,12 +276,14 @@ void stop_udp(void)
 	/* Not very graceful way to close a thread, but as we may be blocked
 	 * in recvfrom call it seems to be necessary
 	 */
+	#if defined(CONFIG_NET_IPV6)
 	if (IS_ENABLED(CONFIG_NET_IPV6)) {
 		k_thread_abort(udp6_thread_id);
 		if (conf.ipv6.udp.sock >= 0) {
 			(void)close(conf.ipv6.udp.sock);
 		}
 	}
+	#endif
 
 	if (IS_ENABLED(CONFIG_NET_IPV4)) {
 		k_thread_abort(udp4_thread_id);
